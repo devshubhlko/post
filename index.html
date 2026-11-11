@@ -18,21 +18,71 @@
 
 <body>
     <div class="app-container">
+        <!-- Mobile Top Navigation Bar (Visible only on mobile <= 900px) -->
+        <header class="mobile-top-bar" id="mobile-top-bar">
+            <div class="mobile-top-brand">
+                <button type="button" class="btn btn-toggle active" id="btn-mob-format-story" data-format="9:16">
+                    <i class="fa-solid fa-mobile-screen"></i> Story
+                </button>
+                <button type="button" class="btn btn-toggle" id="btn-mob-format-square" data-format="1:1">
+                    <i class="fa-regular fa-square"></i> Square
+                </button>
+
+                <button type="button" class="btn-mob-download" id="btn-mob-download-8k" title="Download 8K Poster">
+                    <i class="fa-solid fa-download"></i> Export
+                </button>
+
+            </div>
+        </header>
+
         <main class="workspace">
             <!-- Left Side: Controls -->
             <section class="controls-panel">
-                <!-- Step 1: Input Quote -->
-                <div class="card panel-section">
+                <!-- Step 1: Text Layers & Quote -->
+                <div class="card panel-section" id="panel-step-quote">
                     <div class="section-header">
-                        <span class="step-badge">1</span>
-                        <div>
-                            <h2>Enter Quote</h2>
-                            <p class="section-desc">Type your favorite quote or message</p>
+                        <div class="section-header-content">
+                            <div class="section-title-row">
+                                <div>
+                                    <h2>Text Layers & Quote</h2>
+                                    <p class="section-desc">Add multiple texts, quotes, titles or author names</p>
+                                </div>
+                                <button type="button" id="btn-add-text-top" class="btn btn-add-more"
+                                    title="Add another text layer">
+                                    <i class="fa-solid fa-plus"></i> Add More
+                                </button>
+                            </div>
                         </div>
                     </div>
+
+                    <!-- Text Layers Tab List -->
+                    <div class="text-layers-bar">
+                        <div class="text-tabs-list" id="text-tabs-list">
+                            <!-- Populated dynamically via JS: Text 1, Text 2, etc. -->
+                        </div>
+                    </div>
+
+                    <!-- Selected Text Layer Control Banner -->
+                    <div class="layer-control-toolbar">
+                        <div class="layer-badge-info">
+                            <span class="layer-dot"></span>
+                            <span><strong id="active-layer-title">Text 1</strong></span>
+                        </div>
+                        <div class="layer-toolbar-actions">
+                            <button type="button" id="btn-duplicate-text" class="btn-layer-tool"
+                                title="Duplicate selected text">
+                                <i class="fa-regular fa-copy"></i> Duplicate
+                            </button>
+                            <button type="button" id="btn-delete-text" class="btn-layer-tool btn-tool-delete"
+                                title="Delete selected text">
+                                <i class="fa-regular fa-trash-can"></i> Delete
+                            </button>
+                        </div>
+                    </div>
+
                     <div class="input-group">
-                        <textarea id="quote-input" placeholder="यहाँ अपना विचार या शायरी लिखें..." rows="3"
-                            maxlength="200"></textarea>
+                        <textarea id="quote-input" autocomplete="off" placeholder="यहाँ अपना विचार या शायरी लिखें..."
+                            rows="3" maxlength="200"></textarea>
                         <div class="char-count-wrapper">
                             <span id="char-counter">0/200</span>
                         </div>
@@ -42,9 +92,8 @@
 
 
                 <!-- Step 2: Background (Solid Color or Image) -->
-                <div class="card panel-section">
+                <div class="card panel-section" id="panel-step-bg">
                     <div class="section-header">
-                        <span class="step-badge">2</span>
                         <div>
                             <h2>Background</h2>
                             <p class="section-desc">Choose a solid color or search from our photo library</p>
@@ -120,8 +169,8 @@
                         <div class="image-search-row">
                             <div class="search-input-group">
                                 <i class="fa-solid fa-magnifying-glass search-inner-icon"></i>
-                                <input type="text" id="prompt-input"
-                                    placeholder="Search for images (e.g. nature, cars, architecture)...">
+                                <input type="text" autocomplete="off" id="prompt-input"
+                                    placeholder="Search images (nature, dark, cars)...">
                                 <button type="button" id="btn-generate-ai" class="btn-search-inside" title="Search">
                                     <i class="fa-solid fa-arrows-rotate spinner-icon hidden" id="ai-spinner"></i>
                                     <i class="fa-solid fa-magnifying-glass"></i>
@@ -175,9 +224,8 @@
                 </div>
 
                 <!-- Step 3: Customize Style -->
-                <div class="card panel-section">
+                <div class="card panel-section" id="panel-step-style">
                     <div class="section-header">
-                        <span class="step-badge">3</span>
                         <div>
                             <h2>Customize Style</h2>
                             <p class="section-desc">Select stylish font, alignment, color and text sizing</p>
@@ -189,6 +237,7 @@
                         <div class="typography-header-row">
                             <label><i class="fa-solid fa-font"></i> Typography</label>
                             <span class="active-font-badge" id="active-font-display">Noto Sans Devanagari</span>
+                            <span id="style-target-layer" class="hidden">Text 1</span>
                         </div>
 
                         <!-- Font Language Tabs -->
@@ -204,8 +253,8 @@
                         <!-- Quick Font Filter Search -->
                         <div class="font-search-wrapper">
                             <i class="fa-solid fa-magnifying-glass search-inner-icon"></i>
-                            <input type="text" id="font-search-input"
-                                placeholder="Type font name to filter (e.g. Rozha, Kalam, Poppins)...">
+                            <input type="text" id="font-search-input" autocomplete="off"
+                                placeholder="Search fonts (e.g. Rozha, Kalam)...">
                         </div>
 
                         <!-- Scrollable Font Cards List (Fixed area with infinite scroll) -->
@@ -217,15 +266,31 @@
                     </div>
 
                     <div class="customizer-grid" style="margin-top: 1.25rem;">
+                        <!-- Font Style (Bold, Italic, Underline) -->
+                        <div class="control-item">
+                            <label>Font Style</label>
+                            <div class="toggle-group" id="font-style-group">
+                                <button type="button" class="btn btn-toggle active" id="btn-style-bold" title="Bold">
+                                    <i class="fa-solid fa-bold"></i> <span>Bold</span>
+                                </button>
+                                <button type="button" class="btn btn-toggle" id="btn-style-italic" title="Italic">
+                                    <i class="fa-solid fa-italic"></i> <span>Italic</span>
+                                </button>
+                                <button type="button" class="btn btn-toggle" id="btn-style-underline" title="Underline">
+                                    <i class="fa-solid fa-underline"></i> <span>Underline</span>
+                                </button>
+                            </div>
+                        </div>
+
                         <!-- Alignment -->
                         <div class="control-item">
                             <label>Text Alignment</label>
                             <div class="toggle-group" id="align-group">
-                                <button class="btn btn-toggle" data-value="left"><i
+                                <button class="btn btn-toggle" data-value="left" title="Align Left"><i
                                         class="fa-solid fa-align-left"></i></button>
-                                <button class="btn btn-toggle active" data-value="center"><i
+                                <button class="btn btn-toggle active" data-value="center" title="Align Center"><i
                                         class="fa-solid fa-align-center"></i></button>
-                                <button class="btn btn-toggle" data-value="right"><i
+                                <button class="btn btn-toggle" data-value="right" title="Align Right"><i
                                         class="fa-solid fa-align-right"></i></button>
                             </div>
                         </div>
@@ -245,16 +310,16 @@
                                 <label for="size-slider">Font Size</label>
                                 <span id="size-val">52px</span>
                             </div>
-                            <input type="range" id="size-slider" min="20" max="120" value="52">
+                            <input type="range" id="size-slider" min="16" max="140" value="52">
                         </div>
 
                         <!-- Vertical Position -->
-                        <div class="control-item">
+                        <div class="control-item control-item-full">
                             <div class="slider-label">
                                 <label for="position-slider">Vertical Position</label>
                                 <span id="position-val">50%</span>
                             </div>
-                            <input type="range" id="position-slider" min="10" max="90" value="50">
+                            <input type="range" id="position-slider" min="5" max="95" value="50">
                         </div>
                     </div>
                 </div>
@@ -263,7 +328,7 @@
             <!-- Right Side: Preview & Export -->
             <section class="preview-panel">
                 <div class="sticky-preview">
-                    <!-- Post Format Toggle (9:16 Story vs 1:1 Square) -->
+                    <!-- Post Format Toggle (9:16 Story vs 1:1 Square) & Quick Add -->
                     <div class="format-selector-wrapper">
                         <div class="toggle-group format-toggle-group">
                             <button type="button" class="btn btn-toggle active" id="btn-format-story"
@@ -274,6 +339,10 @@
                                 <i class="fa-regular fa-square"></i> Square
                             </button>
                         </div>
+                        <button type="button" id="btn-preview-add-text" class="btn btn-preview-add"
+                            title="Add another text layer">
+                            <i class="fa-solid fa-plus"></i> Add Text
+                        </button>
                     </div>
 
                     <div class="preview-card-wrapper">
@@ -339,6 +408,22 @@
             </div>
         </div>
     </div>
+
+    <!-- Mobile Bottom Navigation Bar (Fixed at bottom on <= 900px) -->
+    <nav class="mobile-bottom-nav" id="mobile-bottom-nav">
+        <button type="button" class="mob-nav-item active" data-tab="quote">
+            <i class="fa-solid fa-quote-left"></i>
+            <span>Quote</span>
+        </button>
+        <button type="button" class="mob-nav-item" data-tab="bg">
+            <i class="fa-solid fa-image"></i>
+            <span>Background</span>
+        </button>
+        <button type="button" class="mob-nav-item" data-tab="style">
+            <i class="fa-solid fa-sliders"></i>
+            <span>Style</span>
+        </button>
+    </nav>
 
     <script src="app.js"></script>
 </body>
