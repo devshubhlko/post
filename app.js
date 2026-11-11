@@ -21,22 +21,34 @@ const state = {
     format: '9:16', // '9:16' (1080x1920) or '1:1' (1080x1080)
     bgType: 'color', // 'color' or 'image' (Default: 'color')
     solidColor: '#ffffff', // Default: white
-    textColor: '#111111', // Default: dark text for white background
     imageOrientation: 'both', // 'both', 'portrait', or 'landscape'
     selectedImageUrl: '',
     selectedImageElement: null,
     searchPrompt: '',
     loadedCount: 0,
-    textAlignment: 'center',
     loadedFonts: new Set(),
-    activeFontFamily: "'Noto Sans Devanagari', sans-serif",
-    textX: 540,
-    textY: 960,
-    textBounds: null,
-    maxTextWidth: 918,
     isTextSelected: false,
     resizeCorners: null,
-    sideHandles: null
+    sideHandles: null,
+    activeTextId: 'text-1',
+    texts: [
+        {
+            id: 'text-1',
+            text: '',
+            fontFamily: "'Noto Sans Devanagari', sans-serif",
+            fontName: 'Noto Sans Devanagari',
+            fontSize: 52,
+            color: '#111111',
+            isBold: true,
+            isItalic: false,
+            isUnderline: false,
+            alignment: 'center',
+            x: 540,
+            y: 960,
+            maxWidth: 918,
+            bounds: null
+        }
+    ]
 };
 
 // Inline Font Browser State
@@ -46,6 +58,16 @@ const fontState = {
     page: 1,
     pageSize: 12
 };
+
+// Helper accessors for multiple text layers
+function getActiveText() {
+    if (!state.texts || state.texts.length === 0) return null;
+    return state.texts.find(t => t.id === state.activeTextId) || state.texts[0];
+}
+
+function getTextIndex(id) {
+    return state.texts.findIndex(t => t.id === id);
+}
 
 // --- DOM ELEMENTS ---
 const quoteInput = document.getElementById('quote-input');
@@ -79,6 +101,20 @@ const solidColorPresets = document.querySelectorAll('.color-swatch-btn');
 const textColorPicker = document.getElementById('text-color-picker');
 const textColorVal = document.getElementById('text-color-val');
 
+// Multiple Text Layer Controls
+const btnAddTextTop = document.getElementById('btn-add-text-top');
+const btnPreviewAddText = document.getElementById('btn-preview-add-text');
+const textTabsList = document.getElementById('text-tabs-list');
+const activeLayerTitle = document.getElementById('active-layer-title');
+const styleTargetLayer = document.getElementById('style-target-layer');
+const btnDuplicateText = document.getElementById('btn-duplicate-text');
+const btnDeleteText = document.getElementById('btn-delete-text');
+
+// Font Style Buttons (Bold, Italic, Underline)
+const btnStyleBold = document.getElementById('btn-style-bold');
+const btnStyleItalic = document.getElementById('btn-style-italic');
+const btnStyleUnderline = document.getElementById('btn-style-underline');
+
 // File Upload
 const btnBrowseImg = document.getElementById('btn-browse-img');
 const fileUpload = document.getElementById('file-upload');
@@ -106,6 +142,26 @@ const btnDownload8k = document.getElementById('btn-download-8k');
 const downloadSpinner = document.getElementById('download-spinner');
 const modalProcessing = document.getElementById('modal-processing');
 
+// --- MOBILE NAVIGATION CONTROLLER ---
+let activeMobileTab = 'quote'; // 'quote', 'bg', 'style'
+
+function switchMobileTab(tabName) {
+    activeMobileTab = tabName;
+
+    // Update active class on bottom nav items
+    document.querySelectorAll('.mob-nav-item').forEach(btn => {
+        btn.classList.toggle('active', btn.getAttribute('data-tab') === tabName);
+    });
+
+    const panelQuote = document.getElementById('panel-step-quote');
+    const panelBg = document.getElementById('panel-step-bg');
+    const panelStyle = document.getElementById('panel-step-style');
+
+    if (panelQuote) panelQuote.classList.toggle('mob-panel-hidden', tabName !== 'quote');
+    if (panelBg) panelBg.classList.toggle('mob-panel-hidden', tabName !== 'bg');
+    if (panelStyle) panelStyle.classList.toggle('mob-panel-hidden', tabName !== 'style');
+}
+
 // --- INITIALIZATION ---
 window.addEventListener('DOMContentLoaded', () => {
     setupCanvas();
@@ -114,16 +170,18 @@ window.addEventListener('DOMContentLoaded', () => {
     // Default to Solid Color (White)
     setBackgroundType('color');
     updateSolidColor('#ffffff');
-    updateTextColor('#111111');
-    updateCharCount();
 
     // Initialize Format (9:16 default)
     setPostFormat('9:16');
 
+    // Initialize Multiple Text UI
+    renderTextTabs();
+    syncUIWithActiveText();
+
+    // Initialize Mobile Navigation Tab
+    switchMobileTab('quote');
+
     // Initialize Inline Font Browser
-    if (activeFontDisplay) {
-        activeFontDisplay.textContent = 'Noto Sans Devanagari';
-    }
     renderInlineFonts(true);
 
     // Dynamic Fonts Database from CDN in background
@@ -188,9 +246,233 @@ function setupCanvas() {
     canvas.height = state.format === '1:1' ? 1080 : 1920;
 }
 
+// --- TEXT LAYERS MANAGEMENT ---
+function renderTextTabs() {
+    if (!textTabsList) return;
+    textTabsList.innerHTML = '';
+
+    state.texts.forEach((textItem, idx) => {
+        const tab = document.createElement('button');
+        tab.type = 'button';
+        const isActive = textItem.id === state.activeTextId;
+        tab.className = `text-tab-btn ${isActive ? 'active' : ''}`;
+
+        const titleText = `Text ${idx + 1}`;
+
+        const labelSpan = document.createElement('span');
+        labelSpan.textContent = titleText;
+        tab.appendChild(labelSpan);
+
+        // Delete button on tab if more than 1 text layer
+        if (state.texts.length > 1) {
+            const closeBtn = document.createElement('span');
+            closeBtn.className = 'tab-close-icon';
+            closeBtn.innerHTML = '<i class="fa-solid fa-xmark"></i>';
+            closeBtn.title = 'Delete Text Layer';
+            closeBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                deleteTextById(textItem.id);
+            });
+            tab.appendChild(closeBtn);
+        }
+
+        tab.addEventListener('click', () => {
+            setActiveText(textItem.id, true);
+        });
+
+        textTabsList.appendChild(tab);
+    });
+
+    if (btnDeleteText) {
+        btnDeleteText.disabled = state.texts.length <= 1;
+    }
+}
+
+function setActiveText(id, focusInput = false) {
+    state.activeTextId = id;
+    state.isTextSelected = true;
+    renderTextTabs();
+    syncUIWithActiveText(focusInput);
+    drawCanvasPreview();
+}
+
+function syncUIWithActiveText(focusInput = false) {
+    const activeText = getActiveText();
+    if (!activeText) return;
+
+    const idx = getTextIndex(activeText.id);
+    const displayName = `Text ${idx + 1}`;
+
+    if (activeLayerTitle) activeLayerTitle.textContent = displayName;
+    if (styleTargetLayer) styleTargetLayer.textContent = displayName;
+
+    if (quoteInput) {
+        quoteInput.value = activeText.text;
+        updateCharCount();
+        if (focusInput) {
+            quoteInput.focus();
+            quoteInput.setSelectionRange(quoteInput.value.length, quoteInput.value.length);
+        }
+    }
+
+    if (activeFontDisplay) {
+        activeFontDisplay.textContent = activeText.fontName || 'Noto Sans Devanagari';
+    }
+
+    // Font Style Buttons (Bold, Italic, Underline)
+    if (btnStyleBold) {
+        btnStyleBold.classList.toggle('active', !!activeText.isBold);
+    }
+    if (btnStyleItalic) {
+        btnStyleItalic.classList.toggle('active', !!activeText.isItalic);
+    }
+    if (btnStyleUnderline) {
+        btnStyleUnderline.classList.toggle('active', !!activeText.isUnderline);
+    }
+
+    // Alignment Buttons
+    if (alignButtons) {
+        alignButtons.forEach(btn => {
+            btn.classList.toggle('active', btn.getAttribute('data-value') === (activeText.alignment || 'center'));
+        });
+    }
+
+    // Text Color
+    if (textColorPicker) {
+        textColorPicker.value = activeText.color || '#111111';
+    }
+    if (textColorVal) {
+        textColorVal.textContent = (activeText.color || '#111111').toUpperCase();
+    }
+
+    // Font Size Slider
+    if (sizeSlider && sizeVal) {
+        sizeSlider.value = activeText.fontSize || 52;
+        sizeVal.textContent = `${activeText.fontSize || 52}px`;
+    }
+
+    // Vertical Position Slider
+    if (positionSlider && positionVal) {
+        const perc = Math.round((activeText.y / canvas.height) * 100);
+        positionSlider.value = perc;
+        positionVal.textContent = `${perc}%`;
+    }
+
+    if (btnDeleteText) {
+        btnDeleteText.disabled = state.texts.length <= 1;
+    }
+
+    updateFontRowsUI();
+    updateInlineFontPreviews();
+}
+
+function addNewText() {
+    const count = state.texts.length + 1;
+    const currentActive = getActiveText();
+
+    let newY = 960;
+    if (currentActive) {
+        newY = currentActive.y + 110;
+        if (newY > canvas.height - 180) {
+            newY = 220 + (((count - 1) % 6) * 110);
+        }
+    }
+
+    const defaultColor = isColorLight(state.solidColor) ? '#111111' : '#ffffff';
+
+    const newText = {
+        id: `text-${Date.now()}`,
+        text: `Text ${count}`,
+        fontFamily: currentActive ? currentActive.fontFamily : "'Noto Sans Devanagari', sans-serif",
+        fontName: currentActive ? currentActive.fontName : 'Noto Sans Devanagari',
+        fontSize: currentActive ? Math.max(28, currentActive.fontSize - 8) : 44,
+        color: currentActive ? currentActive.color : defaultColor,
+        isBold: false,
+        isItalic: false,
+        isUnderline: false,
+        alignment: 'center',
+        x: canvas.width / 2,
+        y: newY,
+        maxWidth: 918,
+        bounds: null
+    };
+
+    state.texts.push(newText);
+    setActiveText(newText.id, true);
+    drawCanvasPreview();
+}
+
+function deleteTextById(id) {
+    if (state.texts.length <= 1) return;
+    const idx = state.texts.findIndex(t => t.id === id);
+    if (idx === -1) return;
+
+    state.texts.splice(idx, 1);
+
+    if (state.activeTextId === id) {
+        const nextActive = state.texts[Math.max(0, idx - 1)];
+        state.activeTextId = nextActive.id;
+    }
+
+    renderTextTabs();
+    syncUIWithActiveText(false);
+    state.isTextSelected = true;
+    drawCanvasPreview();
+}
+
+function deleteActiveText() {
+    deleteTextById(state.activeTextId);
+}
+
+function duplicateActiveText() {
+    const activeText = getActiveText();
+    if (!activeText) return;
+
+    const cloned = {
+        ...activeText,
+        id: `text-${Date.now()}`,
+        y: Math.min(canvas.height - 100, activeText.y + 90),
+        bounds: null
+    };
+
+    state.texts.push(cloned);
+    setActiveText(cloned.id, true);
+    state.isTextSelected = true;
+    drawCanvasPreview();
+}
+
+// --- FONT STYLE CONTROLLERS (BOLD, ITALIC, UNDERLINE) ---
+function toggleBold() {
+    const t = getActiveText();
+    if (!t) return;
+    t.isBold = !t.isBold;
+    if (btnStyleBold) btnStyleBold.classList.toggle('active', t.isBold);
+    drawCanvasPreview();
+}
+
+function toggleItalic() {
+    const t = getActiveText();
+    if (!t) return;
+    t.isItalic = !t.isItalic;
+    if (btnStyleItalic) btnStyleItalic.classList.toggle('active', t.isItalic);
+    drawCanvasPreview();
+}
+
+function toggleUnderline() {
+    const t = getActiveText();
+    if (!t) return;
+    t.isUnderline = !t.isUnderline;
+    if (btnStyleUnderline) btnStyleUnderline.classList.toggle('active', t.isUnderline);
+    drawCanvasPreview();
+}
+
 // --- POST FORMAT CONTROLLER (9:16 Story vs 1:1 Square) ---
 function setPostFormat(format) {
+    const oldHeight = canvas.height;
     state.format = format; // '9:16' or '1:1'
+
+    const btnMobFormatStory = document.getElementById('btn-mob-format-story');
+    const btnMobFormatSquare = document.getElementById('btn-mob-format-square');
 
     if (format === '1:1') {
         canvas.width = 1080;
@@ -199,6 +481,8 @@ function setPostFormat(format) {
         if (previewFormatPill) previewFormatPill.textContent = '1:1 Square';
         if (btnFormatStory) btnFormatStory.classList.remove('active');
         if (btnFormatSquare) btnFormatSquare.classList.add('active');
+        if (btnMobFormatStory) btnMobFormatStory.classList.remove('active');
+        if (btnMobFormatSquare) btnMobFormatSquare.classList.add('active');
     } else {
         canvas.width = 1080;
         canvas.height = 1920;
@@ -206,12 +490,29 @@ function setPostFormat(format) {
         if (previewFormatPill) previewFormatPill.textContent = '9:16 Story';
         if (btnFormatStory) btnFormatStory.classList.add('active');
         if (btnFormatSquare) btnFormatSquare.classList.remove('active');
+        if (btnMobFormatStory) btnMobFormatStory.classList.add('active');
+        if (btnMobFormatSquare) btnMobFormatSquare.classList.remove('active');
     }
 
-    if (positionSlider) {
-        state.textY = canvas.height * (parseInt(positionSlider.value) / 100);
+    // Scale texts Y positions proportionally so they stay visible
+    const heightRatio = canvas.height / oldHeight;
+    state.texts.forEach(t => {
+        t.y = Math.min(canvas.height - 80, Math.max(80, t.y * heightRatio));
+        if (t.alignment === 'center') {
+            t.x = canvas.width / 2;
+        } else if (t.alignment === 'left') {
+            t.x = canvas.width * 0.085;
+        } else if (t.alignment === 'right') {
+            t.x = canvas.width * 0.915;
+        }
+    });
+
+    const activeText = getActiveText();
+    if (activeText && positionSlider && positionVal) {
+        const perc = Math.round((activeText.y / canvas.height) * 100);
+        positionSlider.value = perc;
+        positionVal.textContent = `${perc}%`;
     }
-    state.textX = canvas.width / 2;
 
     drawCanvasPreview();
 }
@@ -254,7 +555,8 @@ function loadWebFont(family) {
 }
 
 function getSamplePreviewText() {
-    const rawQuote = quoteInput ? quoteInput.value.trim() : '';
+    const activeText = getActiveText();
+    const rawQuote = activeText && activeText.text ? activeText.text.trim() : '';
     if (rawQuote) {
         return rawQuote;
     }
@@ -266,7 +568,8 @@ function createFontItemRow(font) {
     row.className = 'font-item-row';
     row.setAttribute('data-font', font);
 
-    const isCurrent = state.activeFontFamily.includes(`'${font}'`) || state.activeFontFamily === font;
+    const activeText = getActiveText();
+    const isCurrent = activeText && (activeText.fontName === font || activeText.fontFamily.includes(`'${font}'`));
     if (isCurrent) {
         row.classList.add('active-font');
     }
@@ -347,14 +650,32 @@ function handleFontLoadMore() {
 
 function applyInlineFont(font) {
     loadWebFont(font);
-    state.activeFontFamily = `'${font}', sans-serif`;
+    const activeText = getActiveText();
+    if (activeText) {
+        activeText.fontFamily = `'${font}', sans-serif`;
+        activeText.fontName = font;
+    }
 
     if (activeFontDisplay) {
         activeFontDisplay.textContent = font;
     }
 
+    updateFontRowsUI();
+
+    document.fonts.ready.then(() => {
+        drawCanvasPreview();
+    });
+    drawCanvasPreview();
+}
+
+function updateFontRowsUI() {
+    const activeText = getActiveText();
+    if (!activeText) return;
+    const currentFont = activeText.fontName;
+
     document.querySelectorAll('.font-item-row').forEach(r => {
-        const isMatch = r.getAttribute('data-font') === font;
+        const font = r.getAttribute('data-font');
+        const isMatch = font === currentFont;
         r.classList.toggle('active-font', isMatch);
         const btn = r.querySelector('.btn-font-apply');
         if (btn) {
@@ -367,11 +688,6 @@ function applyInlineFont(font) {
             }
         }
     });
-
-    document.fonts.ready.then(() => {
-        drawCanvasPreview();
-    });
-    drawCanvasPreview();
 }
 
 function switchInlineFontLang(lang) {
@@ -455,8 +771,10 @@ function setBackgroundType(type) {
         if (imageBgControls) imageBgControls.classList.add('hidden');
 
         // Auto contrast text if on light background
-        if (isColorLight(state.solidColor) && state.textColor.toLowerCase() === '#ffffff') {
-            updateTextColor('#111111');
+        if (isColorLight(state.solidColor)) {
+            state.texts.forEach(t => {
+                if (t.color.toLowerCase() === '#ffffff') t.color = '#111111';
+            });
         }
     } else {
         if (btnBgImage) btnBgImage.classList.add('active');
@@ -465,10 +783,17 @@ function setBackgroundType(type) {
         if (solidColorControls) solidColorControls.classList.add('hidden');
 
         // Switch to white text for image background if text is still default dark
-        if (state.textColor.toLowerCase() === '#111111') {
-            updateTextColor('#ffffff');
-        }
+        state.texts.forEach(t => {
+            if (t.color.toLowerCase() === '#111111') t.color = '#ffffff';
+        });
     }
+
+    const activeText = getActiveText();
+    if (activeText) {
+        if (textColorPicker) textColorPicker.value = activeText.color;
+        if (textColorVal) textColorVal.textContent = activeText.color.toUpperCase();
+    }
+
     drawCanvasPreview();
 }
 
@@ -490,21 +815,29 @@ function updateSolidColor(color) {
     }
 
     // Auto-adjust text contrast if using pure black or white
-    if (isColorLight(color)) {
-        if (state.textColor.toLowerCase() === '#ffffff') {
-            updateTextColor('#111111');
+    const isLight = isColorLight(color);
+    state.texts.forEach(t => {
+        if (isLight && t.color.toLowerCase() === '#ffffff') {
+            t.color = '#111111';
+        } else if (!isLight && t.color.toLowerCase() === '#111111') {
+            t.color = '#ffffff';
         }
-    } else {
-        if (state.textColor.toLowerCase() === '#111111') {
-            updateTextColor('#ffffff');
-        }
+    });
+
+    const activeText = getActiveText();
+    if (activeText) {
+        if (textColorPicker) textColorPicker.value = activeText.color;
+        if (textColorVal) textColorVal.textContent = activeText.color.toUpperCase();
     }
 
     drawCanvasPreview();
 }
 
-function updateTextColor(color) {
-    state.textColor = color;
+function updateActiveTextColor(color) {
+    const activeText = getActiveText();
+    if (activeText) {
+        activeText.color = color;
+    }
     if (textColorPicker) textColorPicker.value = color;
     if (textColorVal) textColorVal.textContent = color.toUpperCase();
     drawCanvasPreview();
@@ -535,6 +868,71 @@ function setupEventListeners() {
     if (btnFormatSquare) {
         btnFormatSquare.addEventListener('click', () => setPostFormat('1:1'));
     }
+
+    // Mobile Top Bar Format Buttons
+    const btnMobFormatStory = document.getElementById('btn-mob-format-story');
+    const btnMobFormatSquare = document.getElementById('btn-mob-format-square');
+    if (btnMobFormatStory) {
+        btnMobFormatStory.addEventListener('click', () => setPostFormat('9:16'));
+    }
+    if (btnMobFormatSquare) {
+        btnMobFormatSquare.addEventListener('click', () => setPostFormat('1:1'));
+    }
+
+    // Mobile Top Bar Download 8K Button
+    const btnMobDownload8k = document.getElementById('btn-mob-download-8k');
+    if (btnMobDownload8k) {
+        btnMobDownload8k.addEventListener('click', handleDownload8K);
+    }
+
+    // Mobile Bottom Navigation Bar Items
+    document.querySelectorAll('.mob-nav-item').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const tab = btn.getAttribute('data-tab');
+            if (tab) switchMobileTab(tab);
+        });
+    });
+
+    // Add More Text Buttons
+    if (btnAddTextTop) {
+        btnAddTextTop.addEventListener('click', addNewText);
+    }
+    if (btnPreviewAddText) {
+        btnPreviewAddText.addEventListener('click', addNewText);
+    }
+
+    // Duplicate & Delete Text
+    if (btnDuplicateText) {
+        btnDuplicateText.addEventListener('click', duplicateActiveText);
+    }
+    if (btnDeleteText) {
+        btnDeleteText.addEventListener('click', deleteActiveText);
+    }
+
+    // Font Style Buttons (Bold, Italic, Underline)
+    if (btnStyleBold) {
+        btnStyleBold.addEventListener('click', toggleBold);
+    }
+    if (btnStyleItalic) {
+        btnStyleItalic.addEventListener('click', toggleItalic);
+    }
+    if (btnStyleUnderline) {
+        btnStyleUnderline.addEventListener('click', toggleUnderline);
+    }
+
+    // Keyboard Shortcuts (Ctrl+B, Ctrl+I, Ctrl+U)
+    window.addEventListener('keydown', (e) => {
+        if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'b') {
+            e.preventDefault();
+            toggleBold();
+        } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'i') {
+            e.preventDefault();
+            toggleItalic();
+        } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'u') {
+            e.preventDefault();
+            toggleUnderline();
+        }
+    });
 
     // Image Orientation Filter Listeners (Both, Portrait, Landscape)
     if (btnOrientBoth) {
@@ -570,16 +968,20 @@ function setupEventListeners() {
         });
     }
 
-    // Text Color Custom Picker
+    // Text Color Custom Picker (updates currently active text)
     if (textColorPicker) {
         textColorPicker.addEventListener('input', (e) => {
-            updateTextColor(e.target.value);
+            updateActiveTextColor(e.target.value);
         });
     }
 
-    // Quote Input
+    // Quote Input (updates currently active text)
     if (quoteInput) {
         quoteInput.addEventListener('input', () => {
+            const activeText = getActiveText();
+            if (activeText) {
+                activeText.text = quoteInput.value;
+            }
             updateCharCount();
             updateInlineFontPreviews();
             drawCanvasPreview();
@@ -658,37 +1060,47 @@ function setupEventListeners() {
         });
     }
 
-    // Text Size Slider
+    // Text Size Slider (updates currently active text)
     if (sizeSlider && sizeVal) {
         sizeSlider.addEventListener('input', (e) => {
+            const activeText = getActiveText();
+            if (activeText) {
+                activeText.fontSize = parseInt(e.target.value);
+            }
             sizeVal.textContent = `${e.target.value}px`;
             drawCanvasPreview();
         });
     }
 
-    // Vertical Position Slider
+    // Vertical Position Slider (updates currently active text)
     if (positionSlider && positionVal) {
         positionSlider.addEventListener('input', (e) => {
+            const activeText = getActiveText();
+            if (activeText) {
+                activeText.y = canvas.height * (parseInt(e.target.value) / 100);
+            }
             positionVal.textContent = `${e.target.value}%`;
-            state.textY = canvas.height * (parseInt(e.target.value) / 100);
             drawCanvasPreview();
         });
     }
 
-    // Text Alignment Buttons
+    // Text Alignment Buttons (updates currently active text)
     if (alignButtons) {
         alignButtons.forEach(btn => {
             btn.addEventListener('click', () => {
                 alignButtons.forEach(b => b.classList.remove('active'));
                 btn.classList.add('active');
-                state.textAlignment = btn.getAttribute('data-value');
-
-                if (state.textAlignment === 'left') {
-                    state.textX = canvas.width * 0.085;
-                } else if (state.textAlignment === 'right') {
-                    state.textX = canvas.width * 0.915;
-                } else {
-                    state.textX = canvas.width / 2;
+                const align = btn.getAttribute('data-value');
+                const activeText = getActiveText();
+                if (activeText) {
+                    activeText.alignment = align;
+                    if (align === 'left') {
+                        activeText.x = canvas.width * 0.085;
+                    } else if (align === 'right') {
+                        activeText.x = canvas.width * 0.915;
+                    } else {
+                        activeText.x = canvas.width / 2;
+                    }
                 }
                 drawCanvasPreview();
             });
@@ -812,7 +1224,7 @@ async function generateAiImages(prompt, clearGrid = true) {
     }
 }
 
-// --- RENDER TEXT OVERLAY & CANVAS DRAW ---
+// --- RENDER ALL TEXT OVERLAYS & CANVAS DRAW ---
 function drawCanvasPreview(customCanvas = null, customCtx = null, targetWidth = 1080, targetHeight = null) {
     const activeCanvas = customCanvas || canvas;
     const activeCtx = customCtx || ctx;
@@ -857,136 +1269,167 @@ function drawCanvasPreview(customCanvas = null, customCtx = null, targetWidth = 
         }
     }
 
-    // 2. Black overlay: Completely removed
-
-    // 3. Draw Typography
-    const rawQuote = quoteInput ? quoteInput.value.trim() : '';
-    if (!rawQuote) {
-        state.textBounds = null;
-        state.isTextSelected = false;
-        return;
-    }
-
     const scaleFactor = targetWidth / 1080;
-    const baseFontSize = parseInt(sizeSlider.value) * scaleFactor;
+    const heightScale = canvasH / canvas.height;
 
-    // Reset shadow completely (no text shadow)
+    // Reset shadow completely
     activeCtx.shadowColor = 'transparent';
     activeCtx.shadowBlur = 0;
     activeCtx.shadowOffsetX = 0;
     activeCtx.shadowOffsetY = 0;
 
-    const selectedFont = state.activeFontFamily;
-    const textAlignment = state.textAlignment;
+    const activeText = getActiveText();
 
-    activeCtx.font = `bold ${baseFontSize}px ${selectedFont}`;
-    activeCtx.fillStyle = state.textColor || '#111111';
-    activeCtx.textAlign = textAlignment;
-    activeCtx.textBaseline = 'middle';
+    // 2. Draw Each Text Layer
+    state.texts.forEach((textItem) => {
+        const rawQuote = textItem.text ? textItem.text.trim() : '';
+        if (!rawQuote) {
+            textItem.bounds = null;
+            return;
+        }
 
-    const maxTextWidth = state.maxTextWidth * scaleFactor;
-    const lines = wrapText(activeCtx, rawQuote, maxTextWidth);
+        const baseFontSize = (textItem.fontSize || 52) * scaleFactor;
+        const fontStyle = textItem.isItalic ? 'italic' : 'normal';
+        const fontWeight = textItem.isBold ? 'bold' : 'normal';
+        const fontFamily = textItem.fontFamily || "'Noto Sans Devanagari', sans-serif";
 
-    const lineSpacing = baseFontSize * 1.5;
-    const totalTextHeight = (lines.length - 1) * lineSpacing;
+        activeCtx.font = `${fontStyle} ${fontWeight} ${baseFontSize}px ${fontFamily}`;
+        activeCtx.fillStyle = textItem.color || '#111111';
+        activeCtx.textAlign = textItem.alignment || 'center';
+        activeCtx.textBaseline = 'middle';
 
-    const heightScale = canvasH / canvas.height;
-    const centerY = state.textY * heightScale;
-    const xPos = state.textX * scaleFactor;
+        const maxTextWidth = (textItem.maxWidth || 918) * scaleFactor;
+        const lines = wrapText(activeCtx, rawQuote, maxTextWidth);
 
-    let startY = centerY - (totalTextHeight / 2);
+        const lineSpacing = baseFontSize * 1.5;
+        const totalTextHeight = (lines.length - 1) * lineSpacing;
 
-    lines.forEach((line) => {
-        activeCtx.fillText(line, xPos, startY);
-        startY += lineSpacing;
+        const centerY = (textItem.y || 960) * heightScale;
+        const xPos = (textItem.x || 540) * scaleFactor;
+
+        let startY = centerY - (totalTextHeight / 2);
+
+        lines.forEach((line) => {
+            activeCtx.fillText(line, xPos, startY);
+
+            // Draw Underline if enabled
+            if (textItem.isUnderline) {
+                const metrics = activeCtx.measureText(line);
+                const textWidth = metrics.width;
+                let startUnderlineX = xPos;
+                if (textItem.alignment === 'center') {
+                    startUnderlineX = xPos - textWidth / 2;
+                } else if (textItem.alignment === 'right') {
+                    startUnderlineX = xPos - textWidth;
+                }
+                const underlineY = startY + (baseFontSize * 0.46);
+                const underlineThickness = Math.max(2 * scaleFactor, baseFontSize * 0.055);
+
+                activeCtx.save();
+                activeCtx.strokeStyle = textItem.color || '#111111';
+                activeCtx.lineWidth = underlineThickness;
+                activeCtx.lineCap = 'round';
+                activeCtx.beginPath();
+                activeCtx.moveTo(startUnderlineX, underlineY);
+                activeCtx.lineTo(startUnderlineX + textWidth, underlineY);
+                activeCtx.stroke();
+                activeCtx.restore();
+            }
+
+            startY += lineSpacing;
+        });
+
+        // Store bounds for click detection and dragging (only on preview canvas)
+        if (!customCanvas) {
+            let maxLineWidth = 0;
+            lines.forEach(l => {
+                const w = activeCtx.measureText(l).width;
+                if (w > maxLineWidth) maxLineWidth = w;
+            });
+            maxLineWidth = Math.max(60, maxLineWidth);
+
+            const textHeightTotal = (lines.length - 1) * lineSpacing + baseFontSize;
+            const startYPos = centerY - (baseFontSize / 2) - ((lines.length - 1) * lineSpacing / 2);
+
+            let minXPos, maxXPos;
+            if (textItem.alignment === 'left') {
+                minXPos = xPos;
+                maxXPos = xPos + maxLineWidth;
+            } else if (textItem.alignment === 'right') {
+                minXPos = xPos - maxLineWidth;
+                maxXPos = xPos;
+            } else {
+                minXPos = xPos - maxLineWidth / 2;
+                maxXPos = xPos + maxLineWidth / 2;
+            }
+
+            textItem.bounds = {
+                minX: minXPos - 12,
+                maxX: maxXPos + 12,
+                minY: startYPos - 10,
+                maxY: startYPos + textHeightTotal + 10
+            };
+        }
     });
 
-    activeCtx.shadowColor = 'transparent';
-    activeCtx.shadowBlur = 0;
+    // 3. Draw outline & resize handles ONLY for active text on preview canvas
+    if (!customCanvas && state.isTextSelected && activeText && activeText.bounds) {
+        const bounds = activeText.bounds;
+        const pad = 8;
+        const outlineX = bounds.minX - pad;
+        const outlineY = bounds.minY - pad;
+        const outlineW = (bounds.maxX - bounds.minX) + 2 * pad;
+        const outlineH = (bounds.maxY - bounds.minY) + 2 * pad;
 
-    // Store text bounds for dragging (only for the active preview canvas)
-    if (!customCanvas) {
-        const textHeightTotal = (lines.length - 1) * lineSpacing + baseFontSize;
-        const startYPos = centerY - (baseFontSize / 2) - ((lines.length - 1) * lineSpacing / 2);
+        // Dashed Selection Box
+        activeCtx.strokeStyle = 'rgba(99, 102, 241, 0.85)';
+        activeCtx.lineWidth = 1.5;
+        activeCtx.setLineDash([5, 5]);
+        activeCtx.strokeRect(outlineX, outlineY, outlineW, outlineH);
+        activeCtx.setLineDash([]);
 
-        let minXPos, maxXPos;
-        if (state.textAlignment === 'left') {
-            minXPos = xPos;
-            maxXPos = xPos + maxTextWidth;
-        } else if (state.textAlignment === 'right') {
-            minXPos = xPos - maxTextWidth;
-            maxXPos = xPos;
-        } else { // center
-            minXPos = xPos - maxTextWidth / 2;
-            maxXPos = xPos + maxTextWidth / 2;
-        }
+        // 4 Corner handles for font resizing
+        const corners = [
+            { x: outlineX, y: outlineY, cursor: 'nwse-resize' },
+            { x: outlineX + outlineW, y: outlineY, cursor: 'nesw-resize' },
+            { x: outlineX, y: outlineY + outlineH, cursor: 'nesw-resize' },
+            { x: outlineX + outlineW, y: outlineY + outlineH, cursor: 'nwse-resize' }
+        ];
 
-        state.textBounds = {
-            minX: minXPos,
-            maxX: maxXPos,
-            minY: startYPos,
-            maxY: startYPos + textHeightTotal
-        };
+        activeCtx.fillStyle = '#6366f1';
+        activeCtx.strokeStyle = '#ffffff';
+        activeCtx.lineWidth = 2;
+        corners.forEach(corner => {
+            activeCtx.beginPath();
+            activeCtx.arc(corner.x, corner.y, 7, 0, 2 * Math.PI);
+            activeCtx.fill();
+            activeCtx.stroke();
+        });
+        state.resizeCorners = corners;
 
-        // Draw dotted outline and resize handles ONLY if the text is selected!
-        if (state.isTextSelected) {
-            const pad = 12; // padding around text bounds
-            const outlineX = state.textBounds.minX - pad;
-            const outlineY = state.textBounds.minY - pad;
-            const outlineW = (state.textBounds.maxX - state.textBounds.minX) + 2 * pad;
-            const outlineH = (state.textBounds.maxY - state.textBounds.minY) + 2 * pad;
+        // 2 Side handles for wrapping width
+        const sides = [
+            { x: outlineX, y: outlineY + outlineH / 2, cursor: 'ew-resize', type: 'left' },
+            { x: outlineX + outlineW, y: outlineY + outlineH / 2, cursor: 'ew-resize', type: 'right' }
+        ];
 
-            // Draw Dashed Selection Box
-            activeCtx.strokeStyle = 'rgba(99, 102, 241, 0.75)'; // Unified Indigo border
-            activeCtx.lineWidth = 1.5;
-            activeCtx.setLineDash([4, 4]); // Dashed line
-            activeCtx.strokeRect(outlineX, outlineY, outlineW, outlineH);
-            activeCtx.setLineDash([]); // Reset line dash
-
-            // Corner handles (circles for size resizing)
-            const corners = [
-                { x: outlineX, y: outlineY, cursor: 'nwse-resize' }, // Top-Left
-                { x: outlineX + outlineW, y: outlineY, cursor: 'nesw-resize' }, // Top-Right
-                { x: outlineX, y: outlineY + outlineH, cursor: 'nesw-resize' }, // Bottom-Left
-                { x: outlineX + outlineW, y: outlineY + outlineH, cursor: 'nwse-resize' } // Bottom-Right
-            ];
-
-            activeCtx.fillStyle = '#6366f1';
-            activeCtx.strokeStyle = '#ffffff';
-            activeCtx.lineWidth = 1.5;
-            corners.forEach(corner => {
-                activeCtx.beginPath();
-                activeCtx.arc(corner.x, corner.y, 6, 0, 2 * Math.PI);
-                activeCtx.fill();
-                activeCtx.stroke();
-            });
-            state.resizeCorners = corners;
-
-            // Side handles (vertical pills for wrapping width resizing)
-            const sides = [
-                { x: outlineX, y: outlineY + outlineH / 2, cursor: 'ew-resize', type: 'left' },
-                { x: outlineX + outlineW, y: outlineY + outlineH / 2, cursor: 'ew-resize', type: 'right' }
-            ];
-
-            activeCtx.fillStyle = '#ffffff';
-            activeCtx.strokeStyle = '#6366f1';
-            activeCtx.lineWidth = 1.5;
-            sides.forEach(side => {
-                activeCtx.beginPath();
-                if (activeCtx.roundRect) {
-                    activeCtx.roundRect(side.x - 3, side.y - 8, 6, 16, 3);
-                } else {
-                    activeCtx.rect(side.x - 3, side.y - 8, 6, 16);
-                }
-                activeCtx.fill();
-                activeCtx.stroke();
-            });
-            state.sideHandles = sides;
-
-        } else {
-            state.resizeCorners = null;
-            state.sideHandles = null;
-        }
+        activeCtx.fillStyle = '#ffffff';
+        activeCtx.strokeStyle = '#6366f1';
+        activeCtx.lineWidth = 2;
+        sides.forEach(side => {
+            activeCtx.beginPath();
+            if (activeCtx.roundRect) {
+                activeCtx.roundRect(side.x - 4, side.y - 10, 8, 20, 4);
+            } else {
+                activeCtx.rect(side.x - 4, side.y - 10, 8, 20);
+            }
+            activeCtx.fill();
+            activeCtx.stroke();
+        });
+        state.sideHandles = sides;
+    } else if (!customCanvas) {
+        state.resizeCorners = null;
+        state.sideHandles = null;
     }
 }
 
@@ -1118,15 +1561,17 @@ function startDrag(e) {
     const clickX = (clientX - rect.left) * (canvas.width / rect.width);
     const clickY = (clientY - rect.top) * (canvas.height / rect.height);
 
+    const activeText = getActiveText();
+
     // 1. Check click on side handles (for box stretching)
-    if (state.sideHandles && state.isTextSelected) {
+    if (state.sideHandles && state.isTextSelected && activeText) {
         for (let side of state.sideHandles) {
             const dist = Math.hypot(clickX - side.x, clickY - side.y);
-            if (dist <= 12) {
+            if (dist <= 14) {
                 isWrapping = true;
                 activeSideHandle = side;
                 startWrapX = clickX;
-                startMaxTextWidth = state.maxTextWidth;
+                startMaxTextWidth = activeText.maxWidth || 918;
                 canvas.style.cursor = 'ew-resize';
                 if (e.cancelable) e.preventDefault();
                 return;
@@ -1134,43 +1579,51 @@ function startDrag(e) {
         }
     }
 
-    // 2. Check click on any of the 4 corner handles (for proportional resizing)
-    if (state.resizeCorners && state.isTextSelected) {
+    // 2. Check click on any of the 4 corner handles (for proportional font resizing)
+    if (state.resizeCorners && state.isTextSelected && activeText) {
         for (let corner of state.resizeCorners) {
             const dist = Math.hypot(clickX - corner.x, clickY - corner.y);
-            if (dist <= 10) {
+            if (dist <= 12) {
                 isResizing = true;
                 canvas.style.cursor = corner.cursor;
                 startResizeX = clickX;
                 startResizeY = clickY;
-                startFontSize = parseInt(sizeSlider.value);
+                startFontSize = activeText.fontSize || 52;
                 if (e.cancelable) e.preventDefault();
                 return;
             }
         }
     }
 
-    // 3. Check click inside the main text boundaries (for moving/dragging)
-    if (state.textBounds &&
-        clickX >= state.textBounds.minX &&
-        clickX <= state.textBounds.maxX &&
-        clickY >= state.textBounds.minY &&
-        clickY <= state.textBounds.maxY) {
+    // 3. Check click inside any text item boundaries (reverse order: top layer first)
+    for (let i = state.texts.length - 1; i >= 0; i--) {
+        const textItem = state.texts[i];
+        if (textItem.bounds &&
+            clickX >= textItem.bounds.minX &&
+            clickX <= textItem.bounds.maxX &&
+            clickY >= textItem.bounds.minY &&
+            clickY <= textItem.bounds.maxY) {
 
-        state.isTextSelected = true;
-        isDragging = true;
-        canvas.style.cursor = 'grabbing';
+            if (state.activeTextId !== textItem.id) {
+                setActiveText(textItem.id, false);
+            }
 
-        startDragX = clickX - state.textX;
-        startDragY = clickY - state.textY;
+            state.isTextSelected = true;
+            isDragging = true;
+            canvas.style.cursor = 'grabbing';
 
-        drawCanvasPreview();
-        if (e.cancelable) e.preventDefault();
-    } else {
-        // Clicked outside: deselect text box
-        state.isTextSelected = false;
-        drawCanvasPreview();
+            startDragX = clickX - textItem.x;
+            startDragY = clickY - textItem.y;
+
+            drawCanvasPreview();
+            if (e.cancelable) e.preventDefault();
+            return;
+        }
     }
+
+    // 4. Clicked outside: deselect text box
+    state.isTextSelected = false;
+    drawCanvasPreview();
 }
 
 function drag(e) {
@@ -1181,35 +1634,37 @@ function drag(e) {
     const currentX = (clientX - rect.left) * (canvas.width / rect.width);
     const currentY = (clientY - rect.top) * (canvas.height / rect.height);
 
+    const activeText = getActiveText();
+
     // A. Wrapping drag action
-    if (isWrapping && activeSideHandle) {
+    if (isWrapping && activeSideHandle && activeText) {
         let newWidth = startMaxTextWidth;
-        if (state.textAlignment === 'center') {
-            newWidth = Math.abs(currentX - state.textX) * 2;
-        } else if (state.textAlignment === 'left') {
-            newWidth = currentX - state.textX;
-        } else if (state.textAlignment === 'right') {
-            newWidth = state.textX - currentX;
+        if (activeText.alignment === 'center') {
+            newWidth = Math.abs(currentX - activeText.x) * 2;
+        } else if (activeText.alignment === 'left') {
+            newWidth = currentX - activeText.x;
+        } else if (activeText.alignment === 'right') {
+            newWidth = activeText.x - currentX;
         }
 
-        state.maxTextWidth = Math.max(150, Math.min(1000, newWidth));
-
+        activeText.maxWidth = Math.max(150, Math.min(1000, newWidth));
         drawCanvasPreview();
         if (e.cancelable) e.preventDefault();
         return;
     }
 
     // B. Proportional font resizing drag action
-    if (isResizing) {
+    if (isResizing && activeText) {
         const dx = currentX - startResizeX;
         const dy = currentY - startResizeY;
 
         const change = Math.abs(dx) > Math.abs(dy) ? dx : dy;
         const newSize = startFontSize + (change * 0.25);
 
-        const sliderVal = Math.max(20, Math.min(120, Math.round(newSize)));
-        sizeSlider.value = sliderVal;
-        sizeVal.textContent = `${sliderVal}px`;
+        const sliderVal = Math.max(16, Math.min(140, Math.round(newSize)));
+        activeText.fontSize = sliderVal;
+        if (sizeSlider) sizeSlider.value = sliderVal;
+        if (sizeVal) sizeVal.textContent = `${sliderVal}px`;
 
         drawCanvasPreview();
         if (e.cancelable) e.preventDefault();
@@ -1217,16 +1672,16 @@ function drag(e) {
     }
 
     // C. Position moving drag action
-    if (isDragging) {
-        state.textX = currentX - startDragX;
-        state.textY = currentY - startDragY;
+    if (isDragging && activeText) {
+        activeText.x = currentX - startDragX;
+        activeText.y = currentY - startDragY;
 
-        state.textX = Math.max(50, Math.min(canvas.width - 50, state.textX));
-        state.textY = Math.max(100, Math.min(canvas.height - 100, state.textY));
+        activeText.x = Math.max(40, Math.min(canvas.width - 40, activeText.x));
+        activeText.y = Math.max(60, Math.min(canvas.height - 60, activeText.y));
 
-        const sliderPercent = Math.round((state.textY / canvas.height) * 100);
-        positionSlider.value = sliderPercent;
-        positionVal.textContent = `${sliderPercent}%`;
+        const sliderPercent = Math.round((activeText.y / canvas.height) * 100);
+        if (positionSlider) positionSlider.value = sliderPercent;
+        if (positionVal) positionVal.textContent = `${sliderPercent}%`;
 
         drawCanvasPreview();
         if (e.cancelable) e.preventDefault();
@@ -1238,7 +1693,7 @@ function drag(e) {
         // Check side handles hover
         if (state.sideHandles) {
             for (let side of state.sideHandles) {
-                if (Math.hypot(currentX - side.x, currentY - side.y) <= 10) {
+                if (Math.hypot(currentX - side.x, currentY - side.y) <= 12) {
                     canvas.style.cursor = side.cursor;
                     return;
                 }
@@ -1248,7 +1703,7 @@ function drag(e) {
         // Check corner handles hover
         if (state.resizeCorners) {
             for (let corner of state.resizeCorners) {
-                if (Math.hypot(currentX - corner.x, currentY - corner.y) <= 8) {
+                if (Math.hypot(currentX - corner.x, currentY - corner.y) <= 10) {
                     canvas.style.cursor = corner.cursor;
                     return;
                 }
@@ -1256,16 +1711,20 @@ function drag(e) {
         }
     }
 
-    // Check main text bounds hover
-    if (state.textBounds &&
-        currentX >= state.textBounds.minX &&
-        currentX <= state.textBounds.maxX &&
-        currentY >= state.textBounds.minY &&
-        currentY <= state.textBounds.maxY) {
-        canvas.style.cursor = 'grab';
-    } else {
-        canvas.style.cursor = 'default';
+    // Check hover over any text bounds
+    for (let i = state.texts.length - 1; i >= 0; i--) {
+        const textItem = state.texts[i];
+        if (textItem.bounds &&
+            currentX >= textItem.bounds.minX &&
+            currentX <= textItem.bounds.maxX &&
+            currentY >= textItem.bounds.minY &&
+            currentY <= textItem.bounds.maxY) {
+            canvas.style.cursor = 'grab';
+            return;
+        }
     }
+
+    canvas.style.cursor = 'default';
 }
 
 function endDrag() {
