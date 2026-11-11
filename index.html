@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="hi">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Post Creator - 8K Quality</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Noto+Sans+Devanagari:wght@400;600;800&family=Outfit:wght@300;400;600;800&family=Poppins:ital,wght@0,400;0,700;1,400;1,700&family=Rozha+One&family=Yatra+One&display=swap"
+        rel="stylesheet">
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="app-header">
+            <div class="header-main-row">
+                <div class="logo-wrapper">
+                    <i class="fa-brands fa-instagram instagram-icon"></i>
+                    <h1>तस्वीर <span class="accent-text">AI</span></h1>
+                </div>
+            </div>
+            <p class="subtitle">Create Ultra-Realistic 8K Instagram Story & Quote Posts</p>
+        </header>
+
+        <!-- Main Workspace -->
+        <main class="workspace">
+            <!-- Left Side: Controls -->
+            <section class="controls-panel">
+                <!-- Step 1: Input Quote -->
+                <div class="card panel-section">
+                    <div class="section-header">
+                        <span class="step-badge">1</span>
+                        <div>
+                            <h2>Enter Quote</h2>
+                            <p class="section-desc">Type your favorite quote or message</p>
+                        </div>
+                    </div>
+                    <div class="input-group">
+                        <textarea id="quote-input" placeholder="यहाँ अपना विचार या शायरी लिखें..." rows="3"
+                            maxlength="200"></textarea>
+                        <div class="char-count-wrapper">
+                            <span id="char-counter">0/200</span>
+                        </div>
+                    </div>
+                </div>
+
+
+
+                <!-- Step 2: Background (Solid Color or Image) -->
+                <div class="card panel-section">
+                    <div class="section-header">
+                        <span class="step-badge">2</span>
+                        <div>
+                            <h2>Background</h2>
+                            <p class="section-desc">Choose a solid color or search from our photo library</p>
+                        </div>
+                    </div>
+
+                    <!-- Background Mode Toggle -->
+                    <div class="toggle-group bg-type-toggle-group">
+                        <button type="button" class="btn btn-toggle active" id="btn-bg-solid" data-type="color">
+                            <i class="fa-solid fa-fill-drip"></i> Solid Color
+                        </button>
+                        <button type="button" class="btn btn-toggle" id="btn-bg-image" data-type="image">
+                            <i class="fa-solid fa-image"></i> Background Image
+                        </button>
+                    </div>
+
+                    <!-- Option A: Solid Color Controls (Default) -->
+                    <div id="solid-color-controls" class="solid-color-controls">
+                        <div class="control-item">
+                            <label>Pick Custom Color</label>
+                            <div class="color-picker-wrapper">
+                                <input type="color" id="solid-color-picker" class="color-picker-input" value="#ffffff">
+                                <span id="solid-color-val" class="color-hex-badge">#FFFFFF</span>
+                            </div>
+                        </div>
+
+                        <div class="control-item">
+                            <label>Popular Color Presets</label>
+                            <div class="color-presets-grid" id="solid-color-presets">
+                                <button type="button" class="color-swatch-btn active" data-color="#ffffff"
+                                    data-check="#111111"
+                                    style="background-color: #ffffff; --swatch-check-color: #111111;"
+                                    title="White"></button>
+                                <button type="button" class="color-swatch-btn" data-color="#f8fafc" data-check="#111111"
+                                    style="background-color: #f8fafc; --swatch-check-color: #111111;"
+                                    title="Off White"></button>
+                                <button type="button" class="color-swatch-btn" data-color="#fef3c7" data-check="#111111"
+                                    style="background-color: #fef3c7; --swatch-check-color: #111111;"
+                                    title="Warm Cream"></button>
+                                <button type="button" class="color-swatch-btn" data-color="#fce7f3" data-check="#111111"
+                                    style="background-color: #fce7f3; --swatch-check-color: #111111;"
+                                    title="Pastel Pink"></button>
+                                <button type="button" class="color-swatch-btn" data-color="#e0f2fe" data-check="#111111"
+                                    style="background-color: #e0f2fe; --swatch-check-color: #111111;"
+                                    title="Pastel Blue"></button>
+                                <button type="button" class="color-swatch-btn" data-color="#dcfce7" data-check="#111111"
+                                    style="background-color: #dcfce7; --swatch-check-color: #111111;"
+                                    title="Sage Green"></button>
+                                <button type="button" class="color-swatch-btn" data-color="#000000" data-check="#ffffff"
+                                    style="background-color: #000000; --swatch-check-color: #ffffff;"
+                                    title="Pitch Black"></button>
+                                <button type="button" class="color-swatch-btn" data-color="#0f172a" data-check="#ffffff"
+                                    style="background-color: #0f172a; --swatch-check-color: #ffffff;"
+                                    title="Midnight Slate"></button>
+                                <button type="button" class="color-swatch-btn" data-color="#1e1b4b" data-check="#ffffff"
+                                    style="background-color: #1e1b4b; --swatch-check-color: #ffffff;"
+                                    title="Deep Indigo"></button>
+                                <button type="button" class="color-swatch-btn" data-color="#450a0a" data-check="#ffffff"
+                                    style="background-color: #450a0a; --swatch-check-color: #ffffff;"
+                                    title="Crimson"></button>
+                                <button type="button" class="color-swatch-btn" data-color="#064e3b" data-check="#ffffff"
+                                    style="background-color: #064e3b; --swatch-check-color: #ffffff;"
+                                    title="Emerald"></button>
+                                <button type="button" class="color-swatch-btn" data-color="#18181b" data-check="#ffffff"
+                                    style="background-color: #18181b; --swatch-check-color: #ffffff;"
+                                    title="Charcoal"></button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Option B: Image Controls (Search Pexels or Upload) -->
+                    <div id="image-bg-controls" class="image-bg-controls hidden">
+                        <div class="image-search-row">
+                            <div class="search-input-group">
+                                <i class="fa-solid fa-magnifying-glass search-inner-icon"></i>
+                                <input type="text" id="prompt-input"
+                                    placeholder="Search for images (e.g. nature, cars, architecture)...">
+                                <button type="button" id="btn-generate-ai" class="btn-search-inside" title="Search">
+                                    <i class="fa-solid fa-arrows-rotate spinner-icon hidden" id="ai-spinner"></i>
+                                    <i class="fa-solid fa-magnifying-glass"></i>
+                                    <span>Search</span>
+                                </button>
+                            </div>
+                            <!-- Upload Button -->
+                            <button type="button" id="btn-browse-img" class="btn btn-secondary btn-upload-inline"
+                                title="Upload Photo">
+                                <i class="fa-solid fa-arrow-up-from-bracket"></i>
+                                <span>Upload Photo</span>
+                            </button>
+                            <input type="file" id="file-upload" accept="image/*" class="hidden">
+                        </div>
+
+                        <!-- Image Orientation Filter (Both, Portrait, Landscape) -->
+                        <div class="image-orientation-filter">
+                            <span class="filter-label"><i class="fa-solid fa-sliders"></i> Orientation:</span>
+                            <div class="toggle-group orientation-toggle-group">
+                                <button type="button" class="btn btn-toggle active" id="btn-orient-both"
+                                    data-orientation="both">
+                                    <i class="fa-solid fa-border-all"></i> Both
+                                </button>
+                                <button type="button" class="btn btn-toggle" id="btn-orient-portrait"
+                                    data-orientation="portrait">
+                                    <i class="fa-solid fa-mobile-screen"></i> Portrait
+                                </button>
+                                <button type="button" class="btn btn-toggle" id="btn-orient-landscape"
+                                    data-orientation="landscape">
+                                    <i class="fa-solid fa-panorama"></i> Landscape
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Suggestions / Results Grid (Visible only when results arrive) -->
+                        <div class="gallery-container hidden" id="gallery-container">
+                            <div class="gallery-header">
+                                <h3>Pexels Library</h3>
+                            </div>
+                            <div class="image-grid" id="image-grid">
+                                <!-- Image cards will be loaded here dynamically -->
+                            </div>
+                            <div class="load-more-wrapper">
+                                <button id="btn-load-more" class="btn-load-more-small hidden">
+                                    <i class="fa-solid fa-spinner spinner-icon hidden" id="load-more-spinner"></i>
+                                    Load More
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Step 3: Customize Style -->
+                <div class="card panel-section">
+                    <div class="section-header">
+                        <span class="step-badge">3</span>
+                        <div>
+                            <h2>Customize Style</h2>
+                            <p class="section-desc">Select stylish font, alignment, color and text sizing</p>
+                        </div>
+                    </div>
+
+                    <!-- Inline Typography Section -->
+                    <div class="typography-inline-section">
+                        <div class="typography-header-row">
+                            <label><i class="fa-solid fa-font"></i> Typography</label>
+                            <span class="active-font-badge" id="active-font-display">Noto Sans Devanagari</span>
+                        </div>
+
+                        <!-- Font Language Tabs -->
+                        <div class="toggle-group font-type-toggle-group">
+                            <button type="button" class="btn btn-toggle active" id="btn-font-hindi" data-lang="hindi">
+                                Hindi Fonts
+                            </button>
+                            <button type="button" class="btn btn-toggle" id="btn-font-english" data-lang="english">
+                                English Fonts
+                            </button>
+                        </div>
+
+                        <!-- Quick Font Filter Search -->
+                        <div class="font-search-wrapper">
+                            <i class="fa-solid fa-magnifying-glass search-inner-icon"></i>
+                            <input type="text" id="font-search-input"
+                                placeholder="Type font name to filter (e.g. Rozha, Kalam, Poppins)...">
+                        </div>
+
+                        <!-- Scrollable Font Cards List (Fixed area with infinite scroll) -->
+                        <div class="fonts-inline-container">
+                            <div class="fonts-inline-list" id="fonts-inline-list">
+                                <!-- Dynamically populated font items with Apply buttons -->
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="customizer-grid" style="margin-top: 1.25rem;">
+                        <!-- Alignment -->
+                        <div class="control-item">
+                            <label>Text Alignment</label>
+                            <div class="toggle-group" id="align-group">
+                                <button class="btn btn-toggle" data-value="left"><i
+                                        class="fa-solid fa-align-left"></i></button>
+                                <button class="btn btn-toggle active" data-value="center"><i
+                                        class="fa-solid fa-align-center"></i></button>
+                                <button class="btn btn-toggle" data-value="right"><i
+                                        class="fa-solid fa-align-right"></i></button>
+                            </div>
+                        </div>
+
+                        <!-- Text Color -->
+                        <div class="control-item">
+                            <label for="text-color-picker">Text Color</label>
+                            <div class="color-picker-wrapper">
+                                <input type="color" id="text-color-picker" class="color-picker-input" value="#111111">
+                                <span id="text-color-val" class="color-hex-badge">#111111</span>
+                            </div>
+                        </div>
+
+                        <!-- Text Size -->
+                        <div class="control-item">
+                            <div class="slider-label">
+                                <label for="size-slider">Font Size</label>
+                                <span id="size-val">52px</span>
+                            </div>
+                            <input type="range" id="size-slider" min="20" max="120" value="52">
+                        </div>
+
+                        <!-- Vertical Position -->
+                        <div class="control-item">
+                            <div class="slider-label">
+                                <label for="position-slider">Vertical Position</label>
+                                <span id="position-val">50%</span>
+                            </div>
+                            <input type="range" id="position-slider" min="10" max="90" value="50">
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Right Side: Preview & Export -->
+            <section class="preview-panel">
+                <div class="sticky-preview">
+                    <!-- Post Format Toggle (9:16 Story vs 1:1 Square) -->
+                    <div class="format-selector-wrapper">
+                        <div class="toggle-group format-toggle-group">
+                            <button type="button" class="btn btn-toggle active" id="btn-format-story"
+                                data-format="9:16">
+                                <i class="fa-solid fa-mobile-screen"></i> Story
+                            </button>
+                            <button type="button" class="btn btn-toggle" id="btn-format-square" data-format="1:1">
+                                <i class="fa-regular fa-square"></i> Square
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="preview-card-wrapper">
+                        <!-- Canvas Aspect Ratio Container -->
+                        <div class="preview-aspect-container" id="preview-aspect-container">
+                            <div class="preview-card" id="preview-card-element">
+                                <canvas id="preview-canvas"></canvas>
+                                <div class="canvas-grid-lines hidden"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Big Glowing Download Button -->
+                    <div class="action-wrapper">
+                        <button id="btn-download-8k" class="btn btn-download">
+                            <span class="btn-icon-wrapper">
+                                <i class="fa-solid fa-download download-icon"></i>
+                                <i class="fa-solid fa-spinner spinner-icon hidden" id="download-spinner"></i>
+                            </span>
+                            <span class="btn-text-wrapper">
+                                <span class="btn-title">Download 8K Poster</span>
+                                <span class="btn-desc">High Fidelity HDR Quality</span>
+                            </span>
+                            <span class="btn-arrow-right">
+                                <i class="fa-solid fa-arrow-right"></i>
+                            </span>
+                        </button>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Processing Modal -->
+    <div class="modal-overlay hidden" id="modal-processing">
+        <div class="modal-content card">
+            <div class="modal-spinner-wrapper">
+                <div class="hdr-glow-spinner"></div>
+                <i class="fa-solid fa-wand-magic-sparkles magic-pulse"></i>
+            </div>
+            <h2>Processing 8K HDR Post</h2>
+            <div class="process-steps">
+                <div class="step-item active" id="pstep-1">
+                    <i class="fa-solid fa-circle-check check-icon"></i>
+                    <i class="fa-solid fa-spinner spinner-icon spinning"></i>
+                    <span>Upscaling background to 4320x7680 pixels...</span>
+                </div>
+                <div class="step-item" id="pstep-2">
+                    <i class="fa-solid fa-circle-check check-icon"></i>
+                    <i class="fa-solid fa-spinner spinner-icon spinning"></i>
+                    <span>Rendering pristine background composition...</span>
+                </div>
+                <div class="step-item" id="pstep-3">
+                    <i class="fa-solid fa-circle-check check-icon"></i>
+                    <i class="fa-solid fa-spinner spinner-icon spinning"></i>
+                    <span>Drawing high-fidelity Devnagari typography...</span>
+                </div>
+                <div class="step-item" id="pstep-4">
+                    <i class="fa-solid fa-circle-check check-icon"></i>
+                    <i class="fa-solid fa-spinner spinner-icon spinning"></i>
+                    <span>Exporting final 8K JPEG asset...</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+
+</html>
